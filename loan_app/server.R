@@ -95,8 +95,8 @@ shinyServer(function(input, output) {
             text = element_text(family = "Open Sans")) +
       scale_x_continuous(name = "\nMonths") +
       #breaks = seq(0, floor(months() / 12) * 12, by = 12)) + 
-      scale_y_continuous(name = "",
-                         breaks = function(limits) {seq(0, floor(limits[2] / 1000) * 1000, by = 1000)})
+      scale_y_continuous(name = "")
+                         #breaks = function(limits) {seq(0, floor(limits[2] / 1000) * 1000, by = 1000)})
   })
   
   default.interest <- reactive({
