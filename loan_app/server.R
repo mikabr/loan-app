@@ -3,34 +3,49 @@ library(tidyr)
 library(dplyr)
 library(ggplot2)
 
-input <- list(amount = 9000, rate = 5, default.payment = 10, goal.payment = 200)
+input <- list(amount = 9000, rate = 5, default.payment = 100, goal.payment = 200)
 
 shinyServer(function(input, output) {
   
+  amount <- reactive({
+    validate(need(input$amount > 0, "Please enter a positive loan amount."))
+    input$amount
+  })
+  
   comp.rate <- reactive({
-    #     n <- switch(input$period,
-    #                 monthly = 12,
-    #                 quarterly = 4,
-    #                 semiannually = 2,
-    #                 annually = 1)
-    n = 12
-    input$rate / (n * 100)
+    validate(need(input$rate > 0, "Please enter a positive interest rate."))
+    input$rate / 1200
+  })
+  
+  default.payment <- reactive({
+    validate(
+      need(input$default.payment > amount() * comp.rate(),
+           "This minimum payment would result in the loan never getting paid back..."))
+    input$default.payment
+  })
+  
+  goal.payment <- reactive({
+    validate(
+      need(input$goal.payment > amount() * comp.rate(),
+           "This goal payment would result in the loan never getting paid back..."))
+    input$goal.payment
   })
   
   months <- reactive({
-    default.months <- ceiling(log(1 / (1 - input$amount * comp.rate() / input$default.payment)) / log(1 + comp.rate()))
-    goal.months <- ceiling(log(1 / (1 - input$amount * comp.rate() / input$goal.payment)) / log(1 + comp.rate()))
-    max(default.months, goal.months)
+    get.months <- function(payment) {
+      ceiling((log(payment) - log(payment - amount() * comp.rate())) / log(1 + comp.rate()))
+    }
+    max(get.months(default.payment()), get.months(goal.payment()))
   })
   
   data <- reactive({
     
     default.amounts <- array(dim=months())
-    default.amount <- input$amount
+    default.amount <- amount()
     default.amounts[1] <- default.amount
     
     goal.amounts <- array(dim=months())
-    goal.amount <- input$amount
+    goal.amount <- amount()
     goal.amounts[1] <- goal.amount
     
     default.interests <- array(dim=months())
@@ -44,11 +59,11 @@ shinyServer(function(input, output) {
     
     for (m in 1:months()) {
       
-      default.amount <- default.amount * (1 + comp.rate()) - input$default.payment
+      default.amount <- default.amount * (1 + comp.rate()) - default.payment()
       default.amount <- ifelse(default.amount > 0, default.amount, 0)
       default.amounts[m+1] <- default.amount
       
-      goal.amount <- goal.amount * (1 + comp.rate()) - input$goal.payment
+      goal.amount <- goal.amount * (1 + comp.rate()) - goal.payment()
       goal.amount <- ifelse(goal.amount > 0, goal.amount, 0)
       goal.amounts[m+1] <- goal.amount
       
@@ -79,7 +94,7 @@ shinyServer(function(input, output) {
       theme(legend.position = "none",
             text = element_text(family = "Open Sans")) +
       scale_x_continuous(name = "\nMonths") +
-                         #breaks = seq(0, floor(months() / 12) * 12, by = 12)) + 
+      #breaks = seq(0, floor(months() / 12) * 12, by = 12)) + 
       scale_y_continuous(name = "",
                          breaks = function(limits) {seq(0, floor(limits[2] / 1000) * 1000, by = 1000)})
   })
@@ -115,5 +130,5 @@ shinyServer(function(input, output) {
   output$save <- renderText({
     sprintf("Your goal will save you $%s.", round(default.interest() - goal.interest(), 2))
   })
-
+  
 })
